@@ -1,0 +1,147 @@
+---
+title: "Assigment - kNN DIY"
+author:
+  - Ahmad Mansour
+  - Jari Cuijpers
+date: 01-03-2022
+output:
+   html_notebook:
+    toc: true
+    toc_depth: 2
+---
+
+```{r}
+library(tidyverse)
+library(googlesheets4)
+library(class)
+library(caret)
+```
+
+## Business Understanding
+
+#ALB# Albumin is a protein made by your liver #ALP# Alkaline phosphatase is a protein found in all body tissues. #ALT# High levels of ALT may indicate liver damage from hepatitis, infection, cirrhosis, liver cancer, or other liver diseases. #AST# High levels of AST in the blood may indicate hepatitis, cirrhosis, mononucleosis, or other liver diseases #BIL# High levels of bilirubin could mean your liver is not functioning correctly. #CHE# Serum cholinesterase is a blood test that looks at levels of 2 substances that help the nervous system work properly. #CHOL# A complete cholesterol test --- also called a lipid panel or lipid profile --- is a blood test that can measure the amount of cholesterol and triglycerides in your blood. #CREA# A creatinine test is a measure of how well your kidneys are performing their job of filtering waste from your blood #PORT# An implanted port (also known as a "port") is a flexible tube that's placed into a vein in your chest. #GGT# A gamma-glutamyl transferase (GGT) blood test measures the activity of GGT in your blood. high levels of GGT in your blood may indicate liver disease or damage to your liver's bile ducts.
+
+##We can use measures of AST & GGT to determine if a patient has hepatits.
+
+## Data Understanding
+
+- Here are some basic information about the dataset
+
+```{r}
+str(KNN_hcvdat0)
+```
+
+The table has 14 variables (columns) and 615 observations (rows).
+
+## Data Preparation
+
+- The variables,  ID, Age, Sex, CHE, CHOL, CREA, ALP, ALB, ATL, BIL, and PROT are not required so they can be removed
+
+```{r}
+cleanDF <- KNN_hcvdat0[-1]
+
+head(cleanDF)
+
+cleanDF <- select(cleanDF, -Age, -Sex, -CHOL, -ALP, -ALT, -PROT, -ALB, -BIL, -CREA, -CHE)
+
+#Added variable Sex to be removed
+```
+
+```{r}
+cleanDF[-c(534:540, 565:615),]
+cleanDF <- cleanDF[-c(534:540, 565:615),]
+```
+
+
+
+- Our data now consist of 3 variables and 550 observations
+   
+   >>The variable categori contains the outcomes that I would like to predict - 'B' for Blood Donor, 'S' for suspect Blood Donor, 'H'         for Hepatitis, and 'F' Fibrosis;
+   
+```{r}
+cntCateg <- table(cleanDF$Category)
+propCateg <- round(prop.table(cntCateg) * 100 , digits = 1)
+
+cntCateg
+propCateg
+```
+
+   >> by using the tables() & prop.tables() functions, I could have a look at the counts and proportions for all outcomes;
+  
+- The variable is now coded as a type character, however, the model requires that the label is of type factor.
+
+```{r}
+cleanDF$Category <- factor(cleanDF$Category, levels = c("0=Blood Donor", "1=Hepatitis", "0s=suspect Blood Donor", "2=Fibrosis"), labels = c("Blood Donor", "Hepatitis", "suspect Blood Donor", "Fibrosis ")) %>% relevel("Blood Donor")
+
+head(cleanDF, 10)
+
+#Added "2=Fibrosis"
+```
+
+
+
+
+```{r}
+summary(cleanDF[c("AST", "GGT")])
+```
+
+- As being noticed, the variables have very different rangers and as a consequence max. will have a larger impact on the ditance    of calcuation than the min. which could cause a problem for modeling. issue can be solved by applying normalization to recall    all features to s standard range of values.
+
+ ## Test
+
+
+```{r}
+normalize <- function(x) {return ((x - min(x)) / (max(x) - min(x)))}
+
+testSet1 <- c(1:5)
+testSet2 <- c(1:5) * 10
+
+cat("testSet1:", testSet1, "\n")
+cat("testSet2:", testSet2, "\n")
+```
+  #Implementation of normalize function
+
+```{r}
+nCols <- dim(cleanDF)[2]
+cleanDF_n <- sapply(2:nCols,
+                    function(x) {
+  normalize(cleanDF[,x])
+}) %>% as.data.frame()
+
+summary(cleanDF_n[c("AST","GGT")])
+```
+
+ #split my data into training and test sets
+
+```{r}
+
+trainDF_feat <- cleanDF_n[1:480,  ]
+testDF_feat <- cleanDF_n[481:557,  ]
+  
+```
+
+ #Separate training and tests for labels as well
+ 
+```{r}
+trainDF_labels <- cleanDF[1:480,  1]
+testDF_labels <- cleanDF[481:557,  1]
+
+#Old version was 480:557, replaced it with 481:557
+
+```
+
+## Modeling
+
+```{r}
+cleanDF_test_pred <- knn(train = as.matrix(trainDF_feat), test = as.matrix(testDF_feat), cl = as.matrix(trainDF_labels), k = 7)
+head(cleanDF_test_pred)
+```
+
+
+## Evaluation and Deployment
+
+ #Run confusion matrix for results of KNN 
+ 
+```{r}
+confusionMatrix(cleanDF_test_pred, testDF_labels[[1]], positive = NULL, dnn = c("Prediction", "True"))
+```
